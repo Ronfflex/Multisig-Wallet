@@ -15,7 +15,7 @@ A secure and gas-optimized implementation of a multisignature wallet smart contr
 ## Requirements
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation.html)
-- Solidity ^0.8.20
+- Solidity 0.8.28
 - Git
 
 ## Installation
