@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: MIT
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import { Test } from "forge-std/Test.sol";
 import { MultisigWallet } from "../src/MultisigWallet.sol";
+import { IMultisigWallet } from "../src/interfaces/IMultisigWallet.sol";
+import { RevertingContract } from "./helpers/RevertingContract.sol";
 
 contract MultisigWalletTest is Test {
     // Events from the contract for testing
@@ -12,6 +14,19 @@ contract MultisigWalletTest is Test {
     event TransactionExecuted(uint256 indexed txId);
     event SignerAdded(address indexed signer);
     event SignerRemoved(address indexed signer);
+
+    // Custom errors from the interface
+    error ExecutionFailed();
+    error AlreadyExecuted();
+    error InvalidConfirmations();
+    error InvalidSignersCount();
+    error NotSigner();
+    error AlreadyConfirmed();
+    error NotConfirmed();
+    error AlreadySigner();
+    error NotASigner();
+    error TooFewSigners();
+    error InvalidAddress();
 
     // Test addresses
     address[] internal signers;
@@ -33,6 +48,123 @@ contract MultisigWalletTest is Test {
 
         // Fund wallet
         vm.deal(address(wallet), 10 ether);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        MODIFIER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ModifierOnlySigner() public {
+        vm.prank(address(0x999));
+        vm.expectRevert(NotSigner.selector);
+        wallet.submitTransaction(RECEIVER, 1 ether, "");
+    }
+
+    function test_ModifierTxExists() public {
+        vm.prank(signers[0]);
+        vm.expectRevert(InvalidConfirmations.selector);
+        wallet.confirmTransaction(999); // Non-existent transaction ID
+    }
+
+    function test_ModifierNotExecuted() public {
+        // Submit and execute a transaction first
+        vm.startPrank(signers[0]);
+        uint256 txId = wallet.submitTransaction(RECEIVER, 1 ether, "");
+        wallet.confirmTransaction(txId);
+        vm.stopPrank();
+
+        vm.prank(signers[1]);
+        wallet.confirmTransaction(txId);
+
+        vm.prank(signers[0]);
+        wallet.executeTransaction(txId);
+
+        // Try to confirm an executed transaction
+        vm.prank(signers[2]);
+        vm.expectRevert(AlreadyExecuted.selector);
+        wallet.confirmTransaction(txId);
+    }
+
+    function test_ModifierNotConfirmed() public {
+        vm.prank(signers[0]);
+        uint256 txId = wallet.submitTransaction(RECEIVER, 1 ether, "");
+
+        vm.startPrank(signers[1]);
+        wallet.confirmTransaction(txId);
+        vm.expectRevert(AlreadyConfirmed.selector);
+        wallet.confirmTransaction(txId);
+        vm.stopPrank();
+    }
+
+    function test_AddSignerZeroAddress() public {
+        vm.prank(signers[0]);
+        vm.expectRevert(InvalidAddress.selector);
+        wallet.addSigner(address(0));
+    }
+
+    function test_AddExistingSigner() public {
+        vm.prank(signers[0]);
+        vm.expectRevert(AlreadySigner.selector);
+        wallet.addSigner(signers[1]);
+    }
+
+    function test_RemoveNonExistentSigner() public {
+        vm.prank(signers[0]);
+        vm.expectRevert(NotASigner.selector);
+        wallet.removeSigner(address(0x999));
+    }
+
+    // function test_RemoveSignerInvalidConfirmations() public {
+    //     // Add a new signer first
+    //     address newSigner = makeAddr("newSigner");
+    //     vm.prank(signers[0]);
+    //     wallet.addSigner(newSigner);
+
+    //     // Try to remove too many signers
+    //     vm.startPrank(signers[0]);
+    //     wallet.removeSigner(newSigner); // This should work
+    //     vm.expectRevert(InvalidConfirmations.selector);
+    //     wallet.removeSigner(signers[1]); // This should fail
+    //     vm.stopPrank();
+    // }
+
+    function test_AddSigner() public {
+        address newSigner = makeAddr("newSigner");
+
+        vm.prank(signers[0]);
+        vm.expectEmit(true, false, false, true);
+        emit SignerAdded(newSigner);
+
+        wallet.addSigner(newSigner);
+
+        assertTrue(wallet.isSigner(newSigner));
+        assertEq(wallet.getSignerCount(), 4);
+    }
+
+    function test_RemoveSigner() public {
+        // First add a new signer to allow safe removal
+        address newSigner = makeAddr("newSigner");
+        vm.prank(signers[0]);
+        wallet.addSigner(newSigner);
+        assertEq(wallet.getSignerCount(), 4);
+
+        // Now we can safely remove a signer
+        vm.prank(signers[0]);
+        vm.expectEmit(true, false, false, true);
+        emit SignerRemoved(signers[2]);
+
+        wallet.removeSigner(signers[2]);
+
+        assertFalse(wallet.isSigner(signers[2]));
+        assertEq(wallet.getSignerCount(), 3);
+    }
+
+    function testFail_RemoveSignerBelowMinimum() public {
+        // Remove until minimum
+        vm.startPrank(signers[0]);
+        wallet.removeSigner(signers[1]);
+        wallet.removeSigner(signers[2]); // Should fail - would be below minimum
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -145,6 +277,26 @@ contract MultisigWalletTest is Test {
                     TRANSACTION EXECUTION TESTS
     //////////////////////////////////////////////////////////////*/
 
+    function test_ExecuteTransactionFailure() public {
+        // Deploy a contract that reverts on receive
+        RevertingContract reverter = new RevertingContract();
+
+        // Submit transaction to the reverting contract
+        vm.prank(signers[0]);
+        uint256 txId = wallet.submitTransaction(address(reverter), 1 ether, "");
+
+        vm.prank(signers[0]);
+        wallet.confirmTransaction(txId);
+
+        vm.prank(signers[1]);
+        wallet.confirmTransaction(txId);
+
+        // Try to execute - should fail
+        vm.prank(signers[0]);
+        vm.expectRevert(abi.encodeWithSelector(IMultisigWallet.ExecutionFailed.selector));
+        wallet.executeTransaction(txId);
+    }
+
     function test_ExecuteTransaction() public {
         // Submit transaction
         vm.prank(signers[0]);
@@ -224,49 +376,6 @@ contract MultisigWalletTest is Test {
 
         vm.prank(signers[1]);
         wallet.revokeConfirmation(txId); // Should fail - not confirmed
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    SIGNER MANAGEMENT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_AddSigner() public {
-        address newSigner = makeAddr("newSigner");
-
-        vm.prank(signers[0]);
-        vm.expectEmit(true, false, false, true);
-        emit SignerAdded(newSigner);
-
-        wallet.addSigner(newSigner);
-
-        assertTrue(wallet.isSigner(newSigner));
-        assertEq(wallet.getSignerCount(), 4);
-    }
-
-    function test_RemoveSigner() public {
-        // First add a new signer to allow safe removal
-        address newSigner = makeAddr("newSigner");
-        vm.prank(signers[0]);
-        wallet.addSigner(newSigner);
-        assertEq(wallet.getSignerCount(), 4);
-
-        // Now we can safely remove a signer
-        vm.prank(signers[0]);
-        vm.expectEmit(true, false, false, true);
-        emit SignerRemoved(signers[2]);
-
-        wallet.removeSigner(signers[2]);
-
-        assertFalse(wallet.isSigner(signers[2]));
-        assertEq(wallet.getSignerCount(), 3);
-    }
-
-    function testFail_RemoveSignerBelowMinimum() public {
-        // Remove until minimum
-        vm.startPrank(signers[0]);
-        wallet.removeSigner(signers[1]);
-        wallet.removeSigner(signers[2]); // Should fail - would be below minimum
-        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////

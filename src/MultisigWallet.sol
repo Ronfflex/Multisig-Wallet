@@ -192,8 +192,10 @@ contract MultisigWallet is IMultisigWallet {
     /// @inheritdoc IMultisigWallet
     function removeSigner(address signer) external onlySigner {
         if (!_isSigners[signer]) revert NotASigner();
-        if (_signers.length <= MIN_SIGNERS) revert TooFewSigners();
+        // First check if the resulting number of signers would be valid
         if ((_signers.length - 1) < requiredConfirmations) revert InvalidConfirmations();
+        // Then check if we'd have enough signers
+        if (_signers.length <= MIN_SIGNERS) revert TooFewSigners();
 
         _isSigners[signer] = false;
 
