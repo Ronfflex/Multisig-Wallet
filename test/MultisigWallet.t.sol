@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 import { Test } from "forge-std/Test.sol";
 import { MultisigWallet } from "../src/MultisigWallet.sol";
@@ -51,7 +51,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        MODIFIER TESTS
+                            MODIFIER TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_ModifierOnlySigner() public {
@@ -168,7 +168,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        CONSTRUCTOR TESTS
+                            CONSTRUCTOR TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_Constructor() public {
@@ -202,7 +202,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    TRANSACTION SUBMISSION TESTS
+                      TRANSACTION SUBMISSION TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_SubmitTransaction() public {
@@ -227,7 +227,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    TRANSACTION CONFIRMATION TESTS
+                      TRANSACTION CONFIRMATION TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_ConfirmTransaction() public {
@@ -274,7 +274,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    TRANSACTION EXECUTION TESTS
+                       TRANSACTION EXECUTION TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_ExecuteTransactionFailure() public {
@@ -348,7 +348,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    REVOCATION TESTS
+                            REVOCATION TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_RevokeConfirmation() public {
@@ -379,7 +379,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        RECEIVE FUNCTION TEST
+                          RECEIVE FUNCTION TEST
     //////////////////////////////////////////////////////////////*/
 
     function test_ReceiveEther() public {
@@ -391,7 +391,7 @@ contract MultisigWalletTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        FUZZ TESTS
+                               FUZZ TESTS
     //////////////////////////////////////////////////////////////*/
 
     function testFuzz_SubmitTransaction(address to, uint256 value, bytes calldata data) public {

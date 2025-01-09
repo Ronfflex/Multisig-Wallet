@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 import { Script } from "forge-std/Script.sol";
+import { console2 } from "forge-std/console2.sol";
 import { MultisigWallet } from "../src/MultisigWallet.sol";
 
 contract DeployMultisig is Script {
@@ -9,7 +10,7 @@ contract DeployMultisig is Script {
     uint256 constant REQUIRED_CONFIRMATIONS = 2;
     uint256 constant INITIAL_SIGNERS_COUNT = 3;
 
-    function run() public returns (MultisigWallet) {
+    function run() public virtual returns (MultisigWallet) {
         // Load environment variables
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
@@ -30,7 +31,7 @@ contract DeployMultisig is Script {
         return wallet;
     }
 
-    function _getSigners() internal view returns (address[] memory) {
+    function _getSigners() internal returns (address[] memory) {
         address[] memory signers = new address[](INITIAL_SIGNERS_COUNT);
 
         // Try to get signers from environment variables
@@ -55,7 +56,7 @@ contract DeployMultisig is Script {
         return signers;
     }
 
-    function _logDeployment(address wallet, address[] memory signers) internal view {
+    function _logDeployment(address wallet, address[] memory signers) internal pure {
         console2.log("Multisig Wallet deployed at:", wallet);
         console2.log("Required confirmations:", REQUIRED_CONFIRMATIONS);
         console2.log("Initial signers:");
